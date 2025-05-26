@@ -87,18 +87,44 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    inner class CustomAdapter : ArrayAdapter<String>(this, R.layout.item_gasto, R.id.textItem, listaGastos){
+    fun removerItem(position: Int) {
+        val item = listaGastos[position]
+
+        val valor = item.substringAfter("R$").replace(",", ".").toDoubleOrNull() ?: 0.0
+
+        if (item.startsWith("Despesa")) {
+            somaTotal += valor          // remove valor negativo
+        } else if (item.startsWith("Receita")) {
+            somaTotal -= valor          // remove valor positivo
+        }
+
+        listaGastos.removeAt(position)
+        adapter.notifyDataSetChanged()
+
+        ViewTotal.text = "Soma Total: R$%.2f".format(somaTotal)
+        Toast.makeText(this, "Item removido", Toast.LENGTH_SHORT).show()
+    }
+
+
+    inner class CustomAdapter : ArrayAdapter<String>(this@MainActivity, R.layout.item_gasto, R.id.textItem, listaGastos) {
         override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
             val view = super.getView(position, convertView, parent)
             val textView = view.findViewById<TextView>(R.id.textItem)
+            val btnDelete = view.findViewById<Button>(R.id.btnDelete)
 
             val item = listaGastos[position]
-            if (item.startsWith("Receita")){
+            textView.text = item
+
+            if (item.startsWith("Receita")) {
                 textView.setTextColor(android.graphics.Color.parseColor("#388E3C"))
-            } else if (item.startsWith("Despesa")){
+            } else if (item.startsWith("Despesa")) {
                 textView.setTextColor(android.graphics.Color.parseColor("#E71D41"))
             } else {
                 textView.setTextColor(android.graphics.Color.WHITE)
+            }
+
+            btnDelete.setOnClickListener {
+                removerItem(position)
             }
 
             return view
