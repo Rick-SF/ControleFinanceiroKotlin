@@ -1,5 +1,6 @@
 package com.projeto.controlefinanceiro
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -11,6 +12,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import android.app.Activity
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : AppCompatActivity() {
 
@@ -26,9 +30,23 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: ArrayAdapter<String>
     private var somaTotal = 0.0
 
+    // Inicia o Launcher de telas
+    private lateinit var launcher: ActivityResultLauncher<Intent>
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        launcher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val index = result.data?.getIntExtra("itemIndex", -1) ?: -1
+                if (index != -1) {
+                    removerItem(index)
+                }
+            }
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -87,21 +105,51 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    inner class CustomAdapter : ArrayAdapter<String>(this, R.layout.item_gasto, R.id.textItem, listaGastos){
+    fun removerItem(position: Int) {
+        val item = listaGastos[position]
+
+        val valor = item.substringAfter("R$").replace(",", ".").toDoubleOrNull() ?: 0.0
+        if (item.startsWith("Despesa")) {
+            somaTotal += valor // desfaz o valor negativo
+        } else if (item.startsWith("Receita")) {
+            somaTotal -= valor // desfaz o valor positivo
+        }
+
+        listaGastos.removeAt(position)
+        adapter.notifyDataSetChanged()
+
+        ViewTotal.text = "Soma Total: R$%.2f".format(somaTotal)
+        Toast.makeText(this, "Item removido", Toast.LENGTH_SHORT).show()
+    }
+
+
+    inner class CustomAdapter : ArrayAdapter<String>(this, R.layout.item_gasto, R.id.textItem, listaGastos) {
         override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
             val view = super.getView(position, convertView, parent)
             val textView = view.findViewById<TextView>(R.id.textItem)
+            val btnDelete = view.findViewById<Button>(R.id.btnDelete)
 
             val item = listaGastos[position]
-            if (item.startsWith("Receita")){
+            textView.text = item
+
+            if (item.startsWith("Receita")) {
                 textView.setTextColor(android.graphics.Color.parseColor("#388E3C"))
-            } else if (item.startsWith("Despesa")){
+            } else if (item.startsWith("Despesa")) {
                 textView.setTextColor(android.graphics.Color.parseColor("#E71D41"))
             } else {
                 textView.setTextColor(android.graphics.Color.WHITE)
             }
 
+            // Botão de delete agora manda para a página de Confirmação
+            btnDelete.setOnClickListener {
+                val intent = Intent(context, ConfirmarExclusaoActivity::class.java)
+                intent.putExtra("itemIndex", position)
+                intent.putExtra("itemTexto", listaGastos[position])
+                launcher.launch(intent)
+            }
+
             return view
         }
     }
+
 }
