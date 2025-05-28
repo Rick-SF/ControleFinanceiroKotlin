@@ -1,27 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
     android:orientation="horizontal"
-    android:padding="8dp"
-    android:gravity="center_vertical"
-    android:background="#1E1E1E">
+    android:background="#1E1E1E"
+    android:padding="8dp">
 
     <TextView
         android:id="@+id/textItem"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Exemplo"
-        android:textSize="18sp"
-        android:textColor="#FFFFFF" />
-
+        android:text="Item"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"/>
+    
     <Button
-        android:id="@+id/btnDelete"
+        android:id="@+id/BtnApagar"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Apagar"
-        android:textSize="14sp"
-        android:textColor="#FFFFFF"
-        android:backgroundTint="#D32F2F" />
+        android:text="Excluir"
+        android:textSize="15sp"
+        android:backgroundTint="#E71D41"
+        android:textColor="#FFFFFF"/>
+
 </LinearLayout>
