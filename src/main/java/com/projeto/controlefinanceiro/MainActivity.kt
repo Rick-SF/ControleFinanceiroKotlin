@@ -2,28 +2,51 @@ package com.projeto.controlefinanceiro
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.*
+import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ListView
+import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import android.app.Activity
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : AppCompatActivity() {
 
+    // inicialização atrasada das variáveis
     private lateinit var TextDescricao: EditText
     private lateinit var TextValor: EditText
     private lateinit var ListGastos: ListView
     private lateinit var ViewTotal: TextView
     private lateinit var BtnAdicionarReceita: Button
     private lateinit var BtnAdicionarDespesa: Button
-    private lateinit var BtnEditar: Button
 
-    private val listaGastos = DadosFinanceiros.listaGlobal
+    private val listaGastos = mutableListOf<String>()
     private lateinit var adapter: ArrayAdapter<String>
     private var somaTotal = 0.0
+
+    // Inicia o Launcher de telas
+    private lateinit var launcher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        launcher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val index = result.data?.getIntExtra("itemIndex", -1) ?: -1
+                if (index != -1) {
+                    removerItem(index)
+                }
+            }
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -31,56 +54,27 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
+        // define os componentes da tela de acordo com as variáveis
         TextDescricao = findViewById(R.id.Descricao)
         ViewTotal = findViewById(R.id.TotalGasto)
         TextValor = findViewById(R.id.Valor)
         ListGastos = findViewById(R.id.ListaGastos)
         BtnAdicionarReceita = findViewById(R.id.BtnAdicionarReceita)
         BtnAdicionarDespesa = findViewById(R.id.BtnAdicionarDespesa)
-        BtnEditar = findViewById(R.id.BtnEditar)
 
+        // configura a lista
         adapter = CustomAdapter()
         ListGastos.adapter = adapter
 
+        // Condicionais para se apertado o botão de Receita ou Despesa
         BtnAdicionarReceita.setOnClickListener {
             adicionarItem(isGasto = false)
         }
         BtnAdicionarDespesa.setOnClickListener {
             adicionarItem(isGasto = true)
         }
-
-        BtnEditar.setOnClickListener {
-            val intent = Intent(this, EditarActivity::class.java)
-            startActivity(intent)
-        }
     }
-
-    override fun onResume() {
-        super.onResume()
-        recalculaTotal()
-        adapter.notifyDataSetChanged()
-    }
-
-    private fun recalculaTotal() {
-        somaTotal = 0.0
-        for (item in listaGastos) {
-            if (item.startsWith("Receita")) {
-                val valor = extraiValor(item)
-                somaTotal += valor
-            } else if (item.startsWith("Despesa")) {
-                val valor = extraiValor(item)
-                somaTotal -= valor
-            }
-        }
-        ViewTotal.text = "Soma Total: R$%.2f".format(somaTotal)
-    }
-
-    private fun extraiValor(item: String): Double {
-        val regex = Regex("R\\$(\\d+(?:\\.\\d{1,2})?)")
-        val match = regex.find(item)
-        return match?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
-    }
-
+    // Clique no botao que insere o valor e descrição na lista e no total gasto
     fun adicionarItem(isGasto: Boolean) {
         val descricao = TextDescricao.text.toString().trim()
         val valorTexto = TextValor.text.toString().trim()
@@ -88,12 +82,18 @@ class MainActivity : AppCompatActivity() {
         if (descricao.isNotEmpty() && valorTexto.isNotEmpty()) {
             val valor = valorTexto.replace(",", ".").toDoubleOrNull()
             if (valor != null) {
+                val sinal = if (isGasto) -valor else valor
                 val tipo = if (isGasto) "Despesa" else "Receita"
                 val item = "$tipo: $descricao - R$%.2f".format(valor)
 
+                Toast.makeText(this, "Adicionado: $sinal", Toast.LENGTH_SHORT).show()
+                adapter.notifyDataSetChanged()
+
                 listaGastos.add(item)
                 adapter.notifyDataSetChanged()
-                recalculaTotal()
+
+                somaTotal += sinal
+                ViewTotal.text = "Soma Total: R$%.2f".format(somaTotal)
 
                 TextDescricao.text.clear()
                 TextValor.text.clear()
@@ -105,11 +105,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    inner class CustomAdapter : ArrayAdapter<String>(this, R.layout.item_lista_main, R.id.textItem, listaGastos) {
+    fun removerItem(position: Int) {
+        val item = listaGastos[position]
+
+        val valor = item.substringAfter("R$").replace(",", ".").toDoubleOrNull() ?: 0.0
+        if (item.startsWith("Despesa")) {
+            somaTotal += valor // desfaz o valor negativo
+        } else if (item.startsWith("Receita")) {
+            somaTotal -= valor // desfaz o valor positivo
+        }
+
+        listaGastos.removeAt(position)
+        adapter.notifyDataSetChanged()
+
+        ViewTotal.text = "Soma Total: R$%.2f".format(somaTotal)
+        Toast.makeText(this, "Item removido", Toast.LENGTH_SHORT).show()
+    }
+
+
+    inner class CustomAdapter : ArrayAdapter<String>(this, R.layout.item_gasto, R.id.textItem, listaGastos) {
         override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
             val view = super.getView(position, convertView, parent)
             val textView = view.findViewById<TextView>(R.id.textItem)
+            val btnDelete = view.findViewById<Button>(R.id.btnDelete)
+
             val item = listaGastos[position]
+            textView.text = item
+
             if (item.startsWith("Receita")) {
                 textView.setTextColor(android.graphics.Color.parseColor("#388E3C"))
             } else if (item.startsWith("Despesa")) {
@@ -117,7 +139,17 @@ class MainActivity : AppCompatActivity() {
             } else {
                 textView.setTextColor(android.graphics.Color.WHITE)
             }
+
+            // Botão de delete agora manda para a página de Confirmação
+            btnDelete.setOnClickListener {
+                val intent = Intent(context, ConfirmarExclusaoActivity::class.java)
+                intent.putExtra("itemIndex", position)
+                intent.putExtra("itemTexto", listaGastos[position])
+                launcher.launch(intent)
+            }
+
             return view
         }
     }
+
 }
